@@ -1,0 +1,1 @@
+{"name":"Print Creator","short_name":"Print Creator","description":"Private browser photo-to-PDF layout editor by neural-smith","start_url":"./","scope":"./","display":"standalone","background_color":"#1e1e2e","theme_color":"#74c7ec","icons":[{"src":"./icon.png","sizes":"256x256","type":"image/png","purpose":"any maskable"}]}

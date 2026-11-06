@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#1e1e2e">
+  <meta name="description" content="Arrange photographs into printable PDF pages, privately in your browser. By neural-smith.">
+  <title>Print Creator — neural-smith</title>
+  <link rel="icon" href="./icon.png" type="image/png">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main id="app-root">
+    <canvas id="print-creator-canvas" aria-label="Print Creator editor"></canvas>
+    <div id="startup-status" role="status">Loading Print Creator…</div>
+    <div id="browser-message" role="alert" aria-live="polite"></div>
+    <input id="photo-picker" type="file" hidden multiple accept="image/jpeg,image/png,image/webp,image/tiff,image/bmp,.jpg,.jpeg,.png,.webp,.tif,.tiff,.bmp">
+    <input id="project-picker" type="file" hidden accept=".json,application/json">
+    <input id="template-picker" type="file" hidden accept=".xml,text/xml">
+  </main>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

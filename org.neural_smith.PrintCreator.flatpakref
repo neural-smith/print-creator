@@ -1,0 +1,9 @@
+[Flatpak Ref]
+Title=Print Creator
+Name=org.neural_smith.PrintCreator
+Branch=master
+Url=https://neural-smith.github.io/print-creator/
+IsRuntime=false
+RuntimeRepo=https://dl.flathub.org/repo/flathub.flatpakrepo
+SuggestRemoteName=print-creator
+GPGKey=mDMEau3JwxYJKwYBBAHaRw8BAQdAhdP9rz6z4bJvroUdrE3BKJdC7lWeDIyCem91l29iwUS0OG5ldXJhbC1zbWl0aCBQcmludCBDcmVhdG9yIDxqYXdzLXBvc3N1bS11bnJlYWxAZHVjay5jb20+iJkEExYKAEEWIQRoe21zZESas+G0HoyfciGM9/TcRgUCau3JwwIbAwUJA8JnAAULCQgHAgIiAgYVCgkICwIEFgIDAQIeBwIXgAAKCRCfciGM9/TcRgg6APsFt2m1NxdK+u3HzFiF0ZLP4pINQH5Frj9mTr9RySiLVgD/Tls5ezmoxzCtbDWyEF7qr+EUBtd2ziwPRgxITgjziwQ=

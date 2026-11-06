@@ -1,0 +1,8 @@
+:root{color-scheme:dark;background:#1e1e2e;color:#cdd6f4;font:16px system-ui,sans-serif}
+*{box-sizing:border-box}html,body,#app-root{width:100%;height:100%;margin:0;overflow:hidden}
+#app-root{position:relative}#print-creator-canvas{width:100%;height:100%;display:block;outline:none}
+#startup-status{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.1rem;color:#74c7ec}
+#browser-message{position:absolute;bottom:2rem;right:1rem;max-width:min(540px,calc(100% - 2rem));border-radius:8px;background:#313244;color:#f38ba8;padding:0.7rem 1rem;display:none;box-shadow:0 4px 24px #11111b80}
+#browser-message:not(:empty){display:block}
+body.drop-active:after{content:'Drop photos to import';position:absolute;inset:18px;border:3px dashed #74c7ec;background:#1e1e2ed9;color:#74c7ec;font-size:clamp(1.2rem,3vw,2rem);display:grid;place-items:center;pointer-events:none;z-index:5;border-radius:12px}
+@media(prefers-color-scheme:light){:root{background:#eff1f5;color:#4c4f69}#startup-status{color:#209fb5}#browser-message{background:#e6e9ef;color:#d20f39}body.drop-active:after{background:#eff1f5d9;color:#209fb5;border-color:#209fb5}}
