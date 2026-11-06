@@ -101,6 +101,21 @@ jobs:
           echo "url=${url%/}/" >> "$GITHUB_OUTPUT"
         env:
           FLATPAK_PAGES_URL: ${{ vars.FLATPAK_PAGES_URL }}
+      - name: Download the built Flatpak OSTree repository from this run
+        uses: actions/download-artifact@v4
+        with:
+          name: print-creator-flatpak-ostree-x86_64
+          path: dist/built-flatpak
+      - name: Restore the native Flatpak build repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_repo="${RUNNER_TEMP}/print-creator-built-repo"
+          mkdir -p "$source_repo"
+          tar -xzf dist/built-flatpak/flatpak-ostree-repo.tar.gz -C "$source_repo"
+          test -s "$source_repo/config"
+          ostree --repo="$source_repo" rev-parse app/org.neural_smith.PrintCreator/x86_64/master
+          echo "BUILT_REPO_DIR=$source_repo" >> "$GITHUB_ENV"
       - name: Import dedicated Flatpak signing key
         env:
           # Prefer ASCII armor: no extra Base64 encoding or padding to break.
@@ -144,10 +159,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          shopt -s nullglob
-          bundles=(dist/packages/*.flatpak)
-          (( ${#bundles[@]} == 1 )) || { echo 'Expected exactly one Flatpak bundle' >&2; exit 1; }
-          bash ./scripts/update-flatpak-pages.sh "$PAGES_WORKTREE" "${bundles[0]}" "$REPOSITORY_URL"
+          # Import the actual flatpak-builder OSTree ref, not the .flatpak bundle.
+          bash ./scripts/update-flatpak-pages.sh "$PAGES_WORKTREE" "$BUILT_REPO_DIR" "$REPOSITORY_URL"
           # GitHub Pages published-site hard limit: 1 GB.
           bytes="$(du -sb "$PAGES_WORKTREE" | cut -f1)"
           if (( bytes > 950000000 )); then
@@ -199,8 +212,9 @@ jobs:
           shopt -s nullglob
           flatpaks=(dist/packages/*.flatpak)
           appimages=(dist/packages/*.AppImage)
-          if (( ${#flatpaks[@]} != 1 || ${#appimages[@]} != 1 )); then
-            echo 'Expected exactly one Flatpak and one AppImage:' >&2
+          binaries=(dist/packages/PrintCreator-*-linux)
+          if (( ${#flatpaks[@]} != 1 || ${#appimages[@]} != 1 || ${#binaries[@]} != 1 )); then
+            echo 'Expected exactly one Flatpak, one AppImage and one standalone binary:' >&2
             ls -lah dist/packages/ >&2 || true
             exit 1
           fi
@@ -225,7 +239,7 @@ jobs:
           prerelease=()
           if [[ "$RELEASE_TAG" == *-* ]]; then prerelease+=(--prerelease); fi
           gh release create "$RELEASE_TAG" \
-            dist/packages/*.flatpak dist/packages/*.AppImage dist/packages/SHA256SUMS \
+            dist/packages/*.flatpak dist/packages/*.AppImage dist/packages/*-linux dist/packages/SHA256SUMS \
             --verify-tag --draft --generate-notes \
             --title "Print Creator $RELEASE_TAG" "${prerelease[@]}"
 

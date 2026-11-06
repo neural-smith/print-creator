@@ -1,80 +1,73 @@
-"""Verify two successive Flatpak Pages updates keep prior OSTree state and signing."""
-from __future__ import annotations
-
+"""Regression for signed, successive Pages releases without bundle re-import."""
+import hashlib
 import os
 import subprocess
 import tempfile
-import textwrap
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/update-flatpak-pages.sh"
 FINGERPRINT = "0123456789ABCDEF0123456789ABCDEF01234567"
+APP_REF = "app/org.neural_smith.PrintCreator/x86_64/master"
 
-# One shim for the external CLI programs, to test command sequencing without
-# downloading a Flatpak SDK or creating actual OSTree commits in unit tests.
 MOCK_TOOLS = r'''#!/usr/bin/env python3
-import hashlib, os, pathlib, shutil, sys
-argv = sys.argv[1:]
+import os, pathlib, sys
+args = sys.argv[1:]
 name = pathlib.Path(sys.argv[0]).name
 with open(os.environ["COMMAND_LOG"], "a") as f:
-    f.write(name + " " + " ".join(argv) + "\n")
+    f.write(name + " " + " ".join(args) + "\n")
 if name == "gpg":
-    if "--fingerprint" in argv:
+    if "--fingerprint" in args:
         print("fpr:::::::::" + os.environ["MOCK_FINGERPRINT"] + ":")
-    elif "--export" in argv:
-        sys.stdout.buffer.write(b"MOCK_PUBLIC_KEY\n")
+    elif "--export" in args:
+        sys.stdout.buffer.write(b"PUBLIC_KEY\n")
     sys.exit(0)
 if name == "ostree":
-    assert argv[0].startswith("--repo=")
-    repo = pathlib.Path(argv[0][7:])
-    cmd = argv[1]
+    assert args[0].startswith("--repo=")
+    repo = pathlib.Path(args[0][7:])
+    cmd = args[1]
     if cmd == "init":
         repo.mkdir(parents=True, exist_ok=True)
         (repo / "config").write_text("[core]\nmode=archive-z2\n")
         (repo / "refs/heads").mkdir(parents=True, exist_ok=True)
     elif cmd == "rev-parse":
-        ref = argv[2]
-        path = repo / "refs/heads" / ref
-        if not path.is_file():
+        ref = args[2]
+        target = repo / "refs/heads" / ref
+        if not target.is_file():
             sys.exit(1)
-        print(path.read_text().strip())
+        print(target.read_text().strip())
     elif cmd == "pull-local":
-        assert "--untrusted" in argv
-        source = pathlib.Path(argv[-1])
+        assert args[2] == "--untrusted"
+        source, ref = pathlib.Path(args[3]), args[4]
         assert source != repo
-        refs = list((source / "refs/heads").rglob("*"))
-        for item in refs:
-            if item.is_file():
-                dst = repo / "refs/heads" / item.relative_to(source / "refs/heads")
-                dst.parent.mkdir(parents=True, exist_ok=True)
-                dst.write_bytes(item.read_bytes())
-        old = repo / "mock-commit-history"
-        present = set(old.read_text().splitlines()) if old.is_file() else set()
-        present.add((repo / "refs/heads/app/org.neural_smith.PrintCreator/x86_64/master").read_text().strip())
-        old.write_text("\n".join(sorted(present)))
+        source_ref = source / "refs/heads" / ref
+        assert source_ref.is_file(), source_ref
+        target = repo / "refs/heads" / ref
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(source_ref.read_bytes())
+        previous = repo / "mock-commit-history"
+        seen = set(previous.read_text().splitlines()) if previous.is_file() else set()
+        seen.add(target.read_text().strip())
+        previous.write_text("\n".join(sorted(seen)))
     sys.exit(0)
 if name == "flatpak":
-    cmd = argv[0]
-    if cmd == "build-import-bundle":
-        assert "--gpg-sign=" + os.environ["MOCK_FINGERPRINT"] in argv
-        assert "--update-appstream" in argv
-        assert "--no-update-summary" in argv
-        repo, bundle = pathlib.Path(argv[-2]), pathlib.Path(argv[-1])
-        assert "print-creator-flatpak-import." in str(repo)
-        assert (repo / "config").is_file()
-        digest = hashlib.sha256(bundle.read_bytes()).hexdigest()
-        for ref in ["app/org.neural_smith.PrintCreator/x86_64/master", "appstream/x86_64"]:
-            dest = repo / "refs/heads" / ref
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_text(digest)
-    elif cmd == "build-update-repo":
-        assert "--gpg-sign=" + os.environ["MOCK_FINGERPRINT"] in argv
-        repo = pathlib.Path(argv[-1])
+    cmd = args[0]
+    if cmd == "build-sign":
+        assert "--gpg-sign=" + os.environ["MOCK_FINGERPRINT"] in args
+        repo = pathlib.Path(args[-3])
         assert (repo / "refs/heads/app/org.neural_smith.PrintCreator/x86_64/master").is_file()
+        (repo / "mock-commit-signature").write_text(os.environ["MOCK_FINGERPRINT"])
+    elif cmd == "build-update-repo":
+        assert "--gpg-sign=" + os.environ["MOCK_FINGERPRINT"] in args
+        repo = pathlib.Path(args[-1])
+        # The missing directory triggered the actual failure on the second release.
+        assert (repo / "refs/remotes").is_dir()
+        assert (repo / "mock-commit-signature").read_text() == os.environ["MOCK_FINGERPRINT"]
         (repo / "summary").write_text("current summary")
         (repo / "summary.sig").write_text("signed summary")
+    else:
+        raise AssertionError("Unexpected Flatpak command: " + cmd)
     sys.exit(0)
 raise AssertionError(name)
 '''
@@ -88,59 +81,66 @@ class FlatpakIncrementalPublishTest(unittest.TestCase):
         self.bin = self.base / "bin"
         self.bin.mkdir()
         for name in ("flatpak", "ostree", "gpg"):
-            stub = self.bin / name
-            stub.write_text(MOCK_TOOLS)
-            stub.chmod(0o755)
-        self.output = self.base / "pages"
-        self.output.mkdir()
-        (self.output / "app").mkdir()
-        (self.output / "app" / "index.html").write_text("keep web app")
+            executable = self.bin / name
+            executable.write_text(MOCK_TOOLS)
+            executable.chmod(0o755)
+        self.pages = self.base / "pages"
+        (self.pages / "app").mkdir(parents=True)
+        (self.pages / "app/index.html").write_text("keep browser app")
         self.log = self.base / "commands.log"
-        self.env = os.environ.copy()
-        self.env.update({
-            "PATH": str(self.bin) + os.pathsep + os.environ.get("PATH", ""),
-            "FLATPAK_GPG_KEY_ID": FINGERPRINT,
-            "MOCK_FINGERPRINT": FINGERPRINT,
-            "COMMAND_LOG": str(self.log),
-        })
+        self.env = dict(os.environ,
+            PATH=str(self.bin) + os.pathsep + os.environ.get("PATH", ""),
+            FLATPAK_GPG_KEY_ID=FINGERPRINT, MOCK_FINGERPRINT=FINGERPRINT,
+            COMMAND_LOG=str(self.log))
 
     def publish(self, version):
-        bundle = self.base / f"PrintCreator-{version}-x86_64.flatpak"
-        bundle.write_bytes(f"bundle version {version}".encode())
-        return subprocess.run(
-            ["bash", str(SCRIPT), str(self.output), str(bundle),
-             "https://neural-smith.github.io/print-creator/"],
-            env=self.env, capture_output=True, text=True, timeout=30,
-        )
+        built = self.base / f"built-{version}"
+        app = built / "refs/heads" / APP_REF
+        app.parent.mkdir(parents=True)
+        app.write_text(hashlib.sha256(version.encode()).hexdigest())
+        (built / "config").write_text("[core]\nmode=archive-z2\n")
+        return subprocess.run(["bash", str(SCRIPT), str(self.pages), str(built),
+            "https://neural-smith.github.io/print-creator/"],
+            env=self.env, text=True, capture_output=True, timeout=30)
 
-    def test_successive_releases_preserve_history_signature_and_web_app(self):
+    def test_two_releases_keep_old_objects_signing_key_and_browser(self):
         first = self.publish("0.5.0")
         self.assertEqual(first.returncode, 0, first.stderr)
-        old_ref = (self.output / "refs/heads/app/org.neural_smith.PrintCreator/x86_64/master").read_text()
+        old = (self.pages / "refs/heads" / APP_REF).read_text()
+        # Simulates the empty-directory loss when gh-pages was restored via Git.
+        (self.pages / "refs/remotes").rmdir()
         second = self.publish("0.5.1")
         self.assertEqual(second.returncode, 0, second.stderr)
-        new_ref = (self.output / "refs/heads/app/org.neural_smith.PrintCreator/x86_64/master").read_text()
-        self.assertNotEqual(old_ref, new_ref)
-        self.assertEqual(len((self.output / "mock-commit-history").read_text().splitlines()), 2)
-        self.assertEqual((self.output / "flatpak-signing-fingerprint.txt").read_text().strip(), FINGERPRINT)
-        self.assertTrue((self.output / "summary.sig").is_file())
-        self.assertTrue((self.output / "index.flatpakrepo").is_file())
-        self.assertEqual((self.output / "app/index.html").read_text(), "keep web app")
-        logs = self.log.read_text().splitlines()
-        self.assertEqual(sum("flatpak build-import-bundle " in s for s in logs), 2)
-        self.assertEqual(sum("ostree " in s and " pull-local " in s for s in logs), 2)
-        self.assertEqual(sum("flatpak build-update-repo " in s for s in logs), 2)
-        self.assertFalse(any("build-import-bundle" in s and str(self.output) in s for s in logs))
+        current = (self.pages / "refs/heads" / APP_REF).read_text()
+        self.assertNotEqual(old, current)
+        self.assertEqual(len((self.pages / "mock-commit-history").read_text().splitlines()), 2)
+        self.assertEqual((self.pages / "flatpak-signing-fingerprint.txt").read_text().strip(), FINGERPRINT)
+        self.assertEqual((self.pages / "app/index.html").read_text(), "keep browser app")
+        self.assertTrue((self.pages / "summary.sig").is_file())
+        log = self.log.read_text()
+        self.assertNotIn("build-import-bundle", log)
+        self.assertEqual(log.count("ostree --repo=" + str(self.pages) + " pull-local "), 2)
+        self.assertEqual(log.count("flatpak build-sign "), 2)
 
-    def test_signing_key_rotation_rejected_without_mutating_repo(self):
+    def test_key_rotation_rejected_before_mutation(self):
         result = self.publish("0.5.0")
         self.assertEqual(result.returncode, 0, result.stderr)
-        previous = (self.output / "refs/heads/app/org.neural_smith.PrintCreator/x86_64/master").read_text()
+        old = (self.pages / "refs/heads" / APP_REF).read_text()
         self.env["MOCK_FINGERPRINT"] = "F" * 40
         result = self.publish("0.5.1")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Signing key changed", result.stderr)
-        self.assertEqual((self.output / "refs/heads/app/org.neural_smith.PrintCreator/x86_64/master").read_text(), previous)
+        self.assertEqual((self.pages / "refs/heads" / APP_REF).read_text(), old)
+
+    def test_invalid_source_rejected_before_touching_pages(self):
+        built = self.base / "empty-built"
+        built.mkdir()
+        (built / "config").write_text("[core]")
+        result = subprocess.run(["bash", str(SCRIPT), str(self.pages), str(built),
+            "https://neural-smith.github.io/print-creator/"],
+            env=self.env, text=True, capture_output=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.pages / "config").exists())
 
 
 if __name__ == "__main__":

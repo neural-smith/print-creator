@@ -9,9 +9,11 @@ case "${1:-all}" in
     ensure_native_binary "$ROOT"
     bash "$ROOT/scripts/build-flatpak.sh"
     bash "$ROOT/scripts/build-appimage.sh"
+    bash "$ROOT/scripts/build-standalone.sh"
     ;;
   flatpak|--flatpak-only) bash "$ROOT/scripts/build-flatpak.sh" ;;
   appimage|--appimage-only) bash "$ROOT/scripts/build-appimage.sh" ;;
-  -h|--help) echo "Usage: $0 [all|flatpak|appimage]" ;;
-  *) echo "Usage: $0 [all|flatpak|appimage]" >&2; exit 2 ;;
+  standalone|--standalone-only) bash "$ROOT/scripts/build-standalone.sh" ;;
+  -h|--help) echo "Usage: $0 [all|flatpak|appimage|standalone]" ;;
+  *) echo "Usage: $0 [all|flatpak|appimage|standalone]" >&2; exit 2 ;;
 esac

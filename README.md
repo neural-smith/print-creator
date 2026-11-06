@@ -139,6 +139,7 @@ flatpak remote-add --user --if-not-exists flathub \
 ./scripts/build-all.sh            # Flatpak + AppImage
 ./scripts/build-all.sh flatpak    # Flatpak only
 ./scripts/build-all.sh appimage   # AppImage only
+./scripts/build-all.sh standalone # Single UPX-compressed Linux executable
 ```
 
 Artifacts are created under `dist/packages/`, e.g.:
@@ -146,11 +147,12 @@ Artifacts are created under `dist/packages/`, e.g.:
 ```text
 PrintCreator-0.5.0-x86_64.flatpak
 PrintCreator-0.5.0-x86_64.AppImage
+PrintCreator-0.5.0-x86_64-linux
 ```
 
 The combined Linux packaging script compiles the native executable **once on the host**, then stages the same binary independently for Flatpak and AppImage. The Flatpak manifest only installs prebuilt files; it does not invoke Cargo. Separate `flatpak` and `appimage` script invocations compile on demand, unless `RPC_NATIVE_BINARY` points to an existing executable. AppImage packaging uses `linuxdeploy` for library collection and `appimagetool` for the final image.
 
-**Compatibility:** Reusing a host-built executable means the build runner must provide an ELF/GLIBC baseline and library dependencies compatible with `org.freedesktop.Platform//25.08` as well as the intended AppImage hosts. Run `RPC_FLATPAK_SMOKE_TEST=1 bash scripts/build-all.sh` in an environment that permits Flatpak installation/execution to check the packaged application inside the *actual runtime*. The normal build does not perform this runtime check automatically. For maximum portability, building natively against the Flatpak SDK remains preferable, but costs an extra compile. The WebAssembly target must still compile independently. **Both** package builders apply `upx --best --lzma` to the application executable **before packaging**; the uncompressed Cargo binary in `target/release/` is left alone. UPX can affect security scanners or hardened systems, and the final package size is not guaranteed.
+**Compatibility:** Reusing a host-built executable means the build runner must provide an ELF/GLIBC baseline and library dependencies compatible with `org.freedesktop.Platform//25.08` as well as the intended AppImage hosts. Run `RPC_FLATPAK_SMOKE_TEST=1 bash scripts/build-all.sh` in an environment that permits Flatpak installation/execution to check the packaged application inside the *actual runtime*. The normal build does not perform this runtime check automatically. For maximum portability, building natively against the Flatpak SDK remains preferable, but costs an extra compile. The WebAssembly target must still compile independently. The standalone ELF (`*-linux`) is also published directly on GitHub Releases, with `UPX --best --lzma` applied to a separate copy of the shared native binary. Download it, run `chmod +x` and execute it on a compatible Linux distribution; it is **not** a fully portable/static binary. **Both** package builders apply `upx --best --lzma` to the application executable **before packaging**; the uncompressed Cargo binary in `target/release/` is left alone. UPX can affect security scanners or hardened systems, and the final package size is not guaranteed.
 
 The default Flatpak permissions include the home directory (for photo input/output), display access and the CUPS socket. The Flatpak sandbox may prevent launching a host-installed GIMP. The AppImage compatibility floor depends on the libc and libraries of the machine used to build it.
 
@@ -162,13 +164,17 @@ flatpak run org.neural_smith.PrintCreator
 
 chmod +x dist/packages/PrintCreator-0.5.0-x86_64.AppImage
 ./dist/packages/PrintCreator-0.5.0-x86_64.AppImage
+
+chmod +x dist/packages/PrintCreator-0.5.0-x86_64-linux
+./dist/packages/PrintCreator-0.5.0-x86_64-linux --version
+PrintCreator-0.5.0-x86_64-linux
 ```
 
 ## CI, signed provenance and immutable GitHub Releases
 
 The workflows in [`.github/workflows/`](.github/workflows/) have two roles:
 
-- **`rust.yml`** runs project checks and builds the Linux packages. On tagged releases, it creates `SHA256SUMS` and uses `actions/attest@v4` to sign **SLSA build-provenance attestations** for the generated packages and checksum file, with GitHub OIDC/Sigstore.
+- **`rust.yml`** runs project checks and builds the Linux packages. On tagged releases, it creates `SHA256SUMS` and uses `actions/attest@v4` to sign **SLSA build-provenance attestations** for the Flatpak, AppImage, standalone Linux binary and checksum file, with GitHub OIDC/Sigstore.
 - **`release.yml`** runs on version tags (`v*`), validates that the tag matches `Cargo.toml`, requires a committed `Cargo.lock`, reuses `rust.yml`, checks the uploaded build artifacts against their checksums, creates a **draft release**, uploads everything, validates the draft asset list and **then publishes** it.
 
 **Before your first release, enable GitHub Immutable Releases:**
@@ -218,7 +224,7 @@ References: [GitHub Immutable Releases](https://docs.github.com/en/code-security
 
 You can host **a real, GPG-signed Flatpak/OSTree repository** on GitHub Pages for this project. It is not a fake `.flatpakrepo` file pointing to versioned GitHub Release bundles: the Pages site contains the actual OSTree objects, signed summary, and an installable `.flatpakref`. Installation from this repository registers the remote, so `flatpak update` and KDE Discover can find future releases. Automatic *installation* of updates depends on the user's software-center settings.
 
-The publication job is **opt-in**, to preserve ordinary immutable GitHub Releases until Pages and signing are configured. When enabled, version-tag CI builds Linux packages once, verifies checksums, imports and signs the exact already-built `.flatpak` in a clean temporary OSTree repository, transfers the signed commits into the persistent repository, and deploys it to Pages. The immutable GitHub Release is independent of the optional Pages deployment, so a Pages failure does not block release artifacts. The OSTree history is persisted in the `gh-pages` branch, with older commits pruned to limit growth. The intermediate repository prevents a second-release `flatpak build-import-bundle`/OSTree remote assertion when updating an existing repository. Its signed app and AppStream refs are transferred with `ostree pull-local`, without deleting the old repository or changing its signing key. The update repository remains intentionally **mutable** so clients can receive updates; published GitHub Release assets remain **immutable**.
+The publication job is **opt-in**, to preserve ordinary immutable GitHub Releases until Pages and signing are configured. When enabled, version-tag CI builds Linux packages once, verifies checksums, transfers the **already-built Flatpak OSTree ref** into a persistent signed OSTree repository (no `.flatpak` bundle re-import), and deploys it to Pages. The immutable GitHub Release is independent of the optional Pages deployment, so a Pages failure does not block release artifacts. The OSTree history is persisted in the `gh-pages` branch, with older commits pruned to limit growth. The update repository remains intentionally **mutable** so clients can receive updates; published GitHub Release assets remain **immutable**.
 
 ### One-time setup
 
@@ -284,9 +290,26 @@ flatpak install --user print-creator org.neural_smith.PrintCreator
 - OSTree commit and summary GPG signing is **required**. The workflow checks the public-key fingerprint against previous deployments and refuses unplanned key rotation. GitHub build attestations and immutable GitHub Releases are **separate** from Flatpak's GPG trust chain.
 - Only Linux x86_64 is built by the current CI; the Pages repository will not supply ARM64 packages until CI supports that architecture.
 
-A local maintainer can also update a **local** signed OSTree repo with `FLATPAK_GPG_KEY_ID=... ./scripts/update-flatpak-pages.sh DIRECTORY PACKAGE.flatpak https://example.org/repo/`. Publishing that directory to an HTTPS static host is a separate step.
+A local maintainer can also update a **local** signed OSTree repo with `FLATPAK_GPG_KEY_ID=... bash scripts/update-flatpak-pages.sh DIRECTORY dist/flatpak-repo https://example.org/repo/`. Pass the **built OSTree repository**, not the `.flatpak` file. The script recreates the empty `refs/remotes` directory (not preserved by Git) on each run before generating the signed summary. Publishing that directory to an HTTPS static host is a separate step.
 
 References: [Flatpak repository hosting](https://docs.flatpak.org/en/latest/hosting-a-repository.html), [Flatpak single-file bundles](https://docs.flatpak.org/en/latest/single-file-bundles.html), and [GitHub Pages limits](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits).
+
+### Publishing repair: previously failing consecutive updates
+
+Earlier releases used `flatpak build-import-bundle` to reconstruct the repository
+on the Pages runner. That operation failed with `g_str_has_prefix` and an OSTree
+null-remote assertion, and subsequently `flatpak build-update-repo` failed with
+`opendir(refs/remotes)`. The corrected workflow transfers the Flatpak ref from
+`dist/flatpak-repo` (the repository emitted by `flatpak-builder`) using
+`ostree pull-local --untrusted`, signs the installed commit via
+`flatpak build-sign`, and then signs the summary. The build repository is shipped
+between Actions jobs as a private `.tar.gz` artifact, **not** attached to the
+public GitHub Release. The publisher recreates empty `refs/remotes` on each
+run because Git does not preserve empty directories in `gh-pages`.
+
+Do not delete the existing `gh-pages` branch or rotate the GPG key to fix this
+error. Publish a new tag after this workflow patch has been committed. The
+build and publication stages do not compile the application a second time.
 
 ## Quality checks
 

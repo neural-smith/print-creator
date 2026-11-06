@@ -62,7 +62,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            flatpak flatpak-builder patchelf desktop-file-utils file curl \
+            flatpak flatpak-builder ostree patchelf desktop-file-utils file curl \
             pkg-config libxkbcommon-dev libwayland-dev libx11-dev \
             libasound2-dev libssl-dev libfuse2t64
           flatpak remote-add --user --if-not-exists \
@@ -75,14 +75,16 @@ jobs:
       - name: Build Flatpak and AppImage
         # Run explicitly via Bash as a safeguard against ZIP extraction removing the executable bit.
         run: bash ./scripts/build-all.sh
-      - name: Confirm both Linux packages exist
+      - name: Confirm Linux packages and standalone binary exist
         shell: bash
         run: |
           shopt -s nullglob
           flatpaks=(dist/packages/*.flatpak)
           appimages=(dist/packages/*.AppImage)
-          [[ ${#flatpaks[@]} -gt 0 && ${#appimages[@]} -gt 0 ]]
-          ls -lh "${flatpaks[@]}" "${appimages[@]}"
+          binaries=(dist/packages/PrintCreator-*-linux)
+          [[ ${#flatpaks[@]} == 1 && ${#appimages[@]} == 1 && ${#binaries[@]} == 1 ]]
+          [[ -x "${binaries[0]}" ]]
+          ls -lh "${flatpaks[@]}" "${appimages[@]}" "${binaries[@]}"
       - name: Generate and verify package checksums
         shell: bash
         run: |
@@ -90,12 +92,28 @@ jobs:
           shopt -s nullglob
           flatpaks=(dist/packages/*.flatpak)
           appimages=(dist/packages/*.AppImage)
-          if (( ${#flatpaks[@]} != 1 || ${#appimages[@]} != 1 )); then
-            echo 'Expected exactly one Flatpak and one AppImage' >&2
+          binaries=(dist/packages/PrintCreator-*-linux)
+          if (( ${#flatpaks[@]} != 1 || ${#appimages[@]} != 1 || ${#binaries[@]} != 1 )); then
+            echo 'Expected exactly one Flatpak, one AppImage and one standalone binary' >&2
             exit 1
           fi
-          (cd dist/packages && sha256sum -- *.flatpak *.AppImage > SHA256SUMS)
+          (cd dist/packages && sha256sum -- *.flatpak *.AppImage *-linux > SHA256SUMS)
           (cd dist/packages && sha256sum --check SHA256SUMS)
+      - name: Archive the already-built unsigned Flatpak OSTree repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s dist/flatpak-repo/config
+          ostree --repo=dist/flatpak-repo rev-parse app/org.neural_smith.PrintCreator/x86_64/master
+          tar -C dist/flatpak-repo -czf dist/flatpak-ostree-repo.tar.gz .
+          tar -tzf dist/flatpak-ostree-repo.tar.gz > /dev/null
+      - name: Upload Flatpak OSTree repository for Pages (not a public release asset)
+        uses: actions/upload-artifact@v4
+        with:
+          name: print-creator-flatpak-ostree-x86_64
+          path: dist/flatpak-ostree-repo.tar.gz
+          if-no-files-found: error
+          retention-days: 7
       - name: Attest Linux release artifacts (signed SLSA build provenance)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/attest@v4
@@ -108,5 +126,6 @@ jobs:
           path: |
             dist/packages/*.flatpak
             dist/packages/*.AppImage
+            dist/packages/*-linux
             dist/packages/SHA256SUMS
           if-no-files-found: error
