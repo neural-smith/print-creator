@@ -914,16 +914,16 @@ function __wbg_get_imports() {
             getDataViewMemory0().setInt32((arg0 >>> 0) + 4 * 1, len1, true);
             getDataViewMemory0().setInt32((arg0 >>> 0) + 4 * 0, ptr1, true);
         }, arguments); },
-        __wbg_pcDownload_3e0ed5d7031810ab: function(arg0, arg1, arg2, arg3, arg4, arg5) {
+        __wbg_pcDownload_379db1631e1d07c3: function(arg0, arg1, arg2, arg3, arg4, arg5) {
             window.pcDownload(getStringFromWasm0(arg0, arg1), getStringFromWasm0(arg2, arg3), getArrayU8FromWasm0(arg4, arg5));
         },
-        __wbg_pcOpenPhotos_11a078918d56c69b: function() {
+        __wbg_pcOpenPhotos_e47daea2653cda65: function() {
             window.pcOpenPhotos();
         },
-        __wbg_pcOpenProject_3b49ae0646dab4d6: function() {
+        __wbg_pcOpenProject_0e083987861a7b11: function() {
             window.pcOpenProject();
         },
-        __wbg_pcOpenTemplates_641d325de3cdf594: function() {
+        __wbg_pcOpenTemplates_f4cbf1d51d29cc3f: function() {
             window.pcOpenTemplates();
         },
         __wbg_performance_50e6a3f8dc80bbca: function(arg0) {
