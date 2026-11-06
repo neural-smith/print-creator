@@ -44,26 +44,9 @@ pub fn render_page(job: &PrintJob, page_index: usize, dpi: u32) -> Result<RgbaIm
         let raw = metadata::open_photo(&photo.path)
             .with_context(|| format!("decoding {}", photo.path.display()))?;
         let size = raw.dimensions();
-        let mut oriented = metadata::orient(raw, md.orientation);
-        match photo.rotation.rem_euclid(360) {
-            90 => oriented = oriented.rotate90(),
-            180 => oriented = oriented.rotate180(),
-            270 => oriented = oriented.rotate270(),
-            _ => {},
-        }
-        if photo.flip_h { oriented = oriented.fliph(); }
-        if photo.flip_v { oriented = oriented.flipv(); }
-        let allow_autorotate = job.auto_rotate && match &job.layout {
-            model::Layout::Template { auto_rotate, .. } => *auto_rotate,
-            _ => true,
-        };
-        if allow_autorotate {
-            let ratio = oriented.width() as f64 / oriented.height().max(1) as f64;
-            let target = sw as f64 / sh as f64;
-            let normal_score = (ratio/target).min(target/ratio);
-            let rotated_score = ((1./ratio)/target).min(target/(1./ratio));
-            if rotated_score > normal_score + 0.05 { oriented = oriented.rotate90(); }
-        }
+        let oriented = metadata::prepare_for_print(
+            raw, md.orientation, photo, job, rect.width as f64, rect.height as f64,
+        );
         let image = fit_or_crop(oriented, sw, sh, job.effective_crop_mode(photo),
             photo.crop.focal_x, photo.crop.focal_y, photo.crop.zoom)?;
         let iw = image.width();

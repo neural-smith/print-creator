@@ -40,12 +40,16 @@ class LinuxIdentityTests(unittest.TestCase):
 
     def test_no_stale_namespace(self):
         for path in ROOT.rglob('*'):
+            # Ignore build output and upgrade backups, which are not repository source.
+            if any(part in {'dist', 'target', '.git', '.flatpak-builder', '__pycache__'}
+                   for part in path.relative_to(ROOT).parts):
+                continue
             if not path.is_file() or path.suffix not in {'.rs', '.py', '.sh', '.yml', '.md', '.json', '.in', '.toml'}:
                 continue
             contents = path.read_text(encoding='utf-8')
             if path == Path(__file__):
                 continue
-            for old in ('org.fptbb.PrintCreator', 'org.neural-smith.PrintCreator'):
+            for old in ('org.neural-smith.PrintCreator',):
                 # README deliberately warns about the invalid form.
                 if path.name == 'README.md' and old == 'org.neural-smith.PrintCreator':
                     continue

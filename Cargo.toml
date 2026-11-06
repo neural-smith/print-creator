@@ -1,6 +1,6 @@
 [package]
 name = "print-creator"
-version = "0.4.3"
+version = "0.4.4"
 edition = "2021"
 authors = ["neural-smith"]
 license = "GPL-2.0-or-later"
@@ -30,6 +30,8 @@ rfd = { version = "0.15", optional = true }
 tempfile = "3.13"
 
 [profile.release]
-lto = "thin"
+opt-level = "z"
+lto = true
 codegen-units = 1
+panic = "abort"
 strip = true

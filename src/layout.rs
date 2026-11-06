@@ -19,7 +19,14 @@ pub fn slots(layout: &Layout, page: Page, photos: &[&Photo]) -> Result<Vec<RectM
             let count = photos.len().min(*photos_per_page as usize);
             if count == 0 { bail!("no photos to arrange"); }
             let ratios = photos.iter().take(count).map(|p| {
-                let (w,h) = image::image_dimensions(&p.path).unwrap_or((4,3));
+                let (mut w, mut h) = image::image_dimensions(&p.path).unwrap_or((4, 3));
+                let exif_orientation = crate::metadata::read(&p.path).orientation;
+                if matches!(exif_orientation, 5 | 6 | 7 | 8) {
+                    std::mem::swap(&mut w, &mut h);
+                }
+                if matches!(p.rotation.rem_euclid(360), 90 | 270) {
+                    std::mem::swap(&mut w, &mut h);
+                }
                 w as f64 / h.max(1) as f64
             }).collect::<Vec<_>>();
             let mut winner = None::<(f64, Vec<RectMm>)>;

@@ -58,6 +58,9 @@ jobs:
       contents: write
       pages: write
       id-token: write
+    # Settings > Environments > github-pages must explicitly allow Tag: v*.
+    # GitHub rejects tag-triggered Pages deployments before any step executes
+    # unless the environment's deployment branches/tags rules permit them.
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -164,8 +167,9 @@ jobs:
 
   publish:
     name: Create GitHub Release
-    needs: [build-linux, publish-flatpak-pages]
-    if: ${{ always() && needs.build-linux.result == 'success' && (needs.publish-flatpak-pages.result == 'success' || needs.publish-flatpak-pages.result == 'skipped') }}
+    # Pages is an optional update channel. An environment-protection mistake
+    # there must not block the immutable, signed GitHub Release artifacts.
+    needs: build-linux
     runs-on: ubuntu-24.04
     permissions:
       contents: write

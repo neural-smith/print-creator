@@ -132,3 +132,60 @@ fn render_cli_accepts_full_job_from_stdin() {
     assert!(result.status.success(), "{}",String::from_utf8_lossy(&result.stderr));
     assert!(std::fs::read(job.output.path).unwrap().starts_with(b"%PDF-1.4"));
 }
+
+#[test]
+fn manual_rotation_fit_reorients_photo_without_autorotating_it_back() {
+    use print_creator::{model::CropMode, render};
+    let tmp = tempfile::tempdir().unwrap();
+    let mut job = sample_job(tmp.path());
+    let image = image::RgbImage::from_pixel(120, 60, image::Rgb([255, 0, 0]));
+    image.save(&job.photos[0].path).unwrap();
+    job.auto_rotate = true;
+    job.disable_crop = true;
+    job.photos[0].crop.mode = CropMode::Fit;
+    let default_page = render::render_page(&job, 0, 72).unwrap();
+    // Default long-edge matching: landscape photo spans the page width.
+    assert_eq!(default_page.get_pixel(2, default_page.height()/2).0, [255, 0, 0, 255]);
+    assert_eq!(default_page.get_pixel(default_page.width()/2, 2).0, [255, 255, 255, 255]);
+
+    job.photos[0].rotation = 90;
+    let rotated_page = render::render_page(&job, 0, 72).unwrap();
+    // Explicit 90°: the image is portrait and letterboxed horizontally.
+    assert_eq!(rotated_page.get_pixel(2, rotated_page.height()/2).0, [255, 255, 255, 255]);
+    assert_eq!(rotated_page.get_pixel(rotated_page.width()/2, 2).0, [255, 0, 0, 255]);
+}
+
+#[test]
+fn lossless_pdf_preserves_explicit_rotation_even_with_auto_rotate_enabled() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut job = sample_job(tmp.path());
+    job.output.preserve_original_quality = true;
+    job.auto_rotate = true;
+    job.disable_crop = true;
+    job.photos[0].rotation = 90;
+    let paths = output::export(&job).unwrap();
+    let pdf = std::fs::read(&paths[0]).unwrap();
+    assert!(pdf.windows(b"/Width 48 /Height 64".len())
+        .any(|part| part == b"/Width 48 /Height 64"),
+        "manual 90-degree rotation was undone during native PDF export");
+}
+
+#[test]
+fn adaptive_layout_considers_manual_photo_rotation() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut job = sample_job(tmp.path());
+    job.page = Page::from_name("a4").unwrap();
+    job.layout = Layout::Adaptive { photos_per_page: 2, margin_mm: 0.0, gap_mm: 0.0 };
+    // A wide source makes the preferred row/column arrangement unambiguous.
+    image::RgbImage::from_pixel(120, 40, image::Rgb([255, 0, 0]))
+        .save(&job.photos[0].path).unwrap();
+    job.photos.push(job.photos[0].clone());
+    let selected = job.photos.iter().collect::<Vec<_>>();
+    let original = print_creator::layout::job_slots(&job, &selected).unwrap();
+    assert!(original[1].y > original[0].y,
+        "wide photos should favor two horizontal rows on A4");
+    for photo in &mut job.photos { photo.rotation = 90; }
+    let rotated = print_creator::layout::job_slots(&job, &job.photos.iter().collect::<Vec<_>>()).unwrap();
+    assert!(rotated[1].x > rotated[0].x,
+        "portrait photos should favor two vertical columns on A4");
+}

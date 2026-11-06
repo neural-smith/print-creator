@@ -144,24 +144,9 @@ impl<W: Write + Seek> NativePdfWriter<W> {
             let raw = metadata::open_photo(&photo.path)
                 .with_context(|| format!("opening {}", photo.path.display()))?;
             let original_size = raw.dimensions();
-            let mut oriented = metadata::orient(raw, md.orientation);
-            oriented = match photo.rotation.rem_euclid(360) {
-                90 => oriented.rotate90(), 180 => oriented.rotate180(),
-                270 => oriented.rotate270(), _ => oriented,
-            };
-            if photo.flip_h { oriented = oriented.fliph(); }
-            if photo.flip_v { oriented = oriented.flipv(); }
-            let allow_autorotate = job.auto_rotate && match &job.layout {
-                model::Layout::Template { auto_rotate, .. } => *auto_rotate,
-                _ => true,
-            };
-            if allow_autorotate {
-                let ratio = oriented.width() as f64 / oriented.height().max(1) as f64;
-                let target = frame.width as f64 / frame.height as f64;
-                let score = (ratio/target).min(target/ratio);
-                let rotated_score = ((1./ratio)/target).min(target/(1./ratio));
-                if rotated_score > score+0.05 { oriented = oriented.rotate90(); }
-            }
+            let oriented = metadata::prepare_for_print(
+                raw, md.orientation, photo, job, frame.width as f64, frame.height as f64,
+            );
             let (iw, ih) = oriented.dimensions();
             let id = self.add_image(oriented)?;
             let label = format!("Im{i}");
