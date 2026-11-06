@@ -1,28 +1,5 @@
 /* @ts-self-types="./print_creator.d.ts" */
 
-/**
- * Chroma subsampling format
- * @enum {0 | 1 | 2 | 3}
- */
-export const ChromaSampling = Object.freeze({
-    /**
-     * Both vertically and horizontally subsampled.
-     */
-    Cs420: 0, "0": "Cs420",
-    /**
-     * Horizontally subsampled.
-     */
-    Cs422: 1, "1": "Cs422",
-    /**
-     * Not subsampled.
-     */
-    Cs444: 2, "2": "Cs444",
-    /**
-     * Monochrome.
-     */
-    Cs400: 3, "3": "Cs400",
-});
-
 export function boot() {
     wasm.boot();
 }
@@ -937,16 +914,16 @@ function __wbg_get_imports() {
             getDataViewMemory0().setInt32((arg0 >>> 0) + 4 * 1, len1, true);
             getDataViewMemory0().setInt32((arg0 >>> 0) + 4 * 0, ptr1, true);
         }, arguments); },
-        __wbg_pcDownload_4a89f06de278d56d: function(arg0, arg1, arg2, arg3, arg4, arg5) {
+        __wbg_pcDownload_3e0ed5d7031810ab: function(arg0, arg1, arg2, arg3, arg4, arg5) {
             window.pcDownload(getStringFromWasm0(arg0, arg1), getStringFromWasm0(arg2, arg3), getArrayU8FromWasm0(arg4, arg5));
         },
-        __wbg_pcOpenPhotos_09180f2ad4b36612: function() {
+        __wbg_pcOpenPhotos_11a078918d56c69b: function() {
             window.pcOpenPhotos();
         },
-        __wbg_pcOpenProject_53285bd6e833160e: function() {
+        __wbg_pcOpenProject_3b49ae0646dab4d6: function() {
             window.pcOpenProject();
         },
-        __wbg_pcOpenTemplates_f7feb11a6393e8ab: function() {
+        __wbg_pcOpenTemplates_641d325de3cdf594: function() {
             window.pcOpenTemplates();
         },
         __wbg_performance_50e6a3f8dc80bbca: function(arg0) {
@@ -1247,23 +1224,23 @@ function __wbg_get_imports() {
             return ret;
         },
         __wbindgen_generic_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 939, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_6338);
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 913, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_3434);
             return ret;
         },
         __wbindgen_generic_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("Array<any>")], shim_idx: 715, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_3806);
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("Array<any>")], shim_idx: 769, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_1726);
             return ret;
         },
         __wbindgen_generic_0000000000000003: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("Event")], shim_idx: 715, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_3806_6);
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("Event")], shim_idx: 769, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_1726_6);
             return ret;
         },
         __wbindgen_generic_0000000000000004: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [], shim_idx: 714, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_3805);
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [], shim_idx: 772, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_1728);
             return ret;
         },
         __wbindgen_generic_0000000000000005: function(arg0, arg1) {
@@ -1321,18 +1298,18 @@ function __wbg_get_imports() {
     };
 }
 
-function __wasm_bindgen_func_elem_3806(arg0, arg1, arg2) {
-    wasm.__wasm_bindgen_func_elem_3806(arg0, arg1, arg2);
+function __wasm_bindgen_func_elem_1726(arg0, arg1, arg2) {
+    wasm.__wasm_bindgen_func_elem_1726(arg0, arg1, arg2);
 }
 
-function __wasm_bindgen_func_elem_3806_6(arg0, arg1, arg2) {
-    wasm.__wasm_bindgen_func_elem_3806_6(arg0, arg1, arg2);
+function __wasm_bindgen_func_elem_1726_6(arg0, arg1, arg2) {
+    wasm.__wasm_bindgen_func_elem_1726_6(arg0, arg1, arg2);
 }
 
-function __wasm_bindgen_func_elem_3805(arg0, arg1) {
+function __wasm_bindgen_func_elem_1728(arg0, arg1) {
     try {
         const retptr = wasm.__wbindgen_add_to_stack_pointer(-16) >>> 0;
-        wasm.__wasm_bindgen_func_elem_3805(retptr, arg0, arg1);
+        wasm.__wasm_bindgen_func_elem_1728(retptr, arg0, arg1);
         var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
         var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
         if (r1) {
@@ -1343,10 +1320,10 @@ function __wasm_bindgen_func_elem_3805(arg0, arg1) {
     }
 }
 
-function __wasm_bindgen_func_elem_6338(arg0, arg1, arg2) {
+function __wasm_bindgen_func_elem_3434(arg0, arg1, arg2) {
     try {
         const retptr = wasm.__wbindgen_add_to_stack_pointer(-16) >>> 0;
-        wasm.__wasm_bindgen_func_elem_6338(retptr, arg0, arg1, arg2);
+        wasm.__wasm_bindgen_func_elem_3434(retptr, arg0, arg1, arg2);
         var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
         var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
         if (r1) {
