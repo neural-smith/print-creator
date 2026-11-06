@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=@APP_NAME@
+GenericName=Photo Print Layout Creator
+Comment=Create printable PDF layouts from photos
+Exec=@BIN_NAME@ gui
+Icon=@APP_ID@
+Terminal=false
+StartupNotify=true
+StartupWMClass=@BIN_NAME@
+Categories=Graphics;Photography;Printing;
+Keywords=Print;Photos;Layout;PDF;digiKam;
+X-PrintCreator-Author=@AUTHOR_DESKTOP@

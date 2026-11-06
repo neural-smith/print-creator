@@ -1,0 +1,60 @@
+# Rust / Cargo build products (Cargo.lock is intentionally committed).
+/target/
+**/target/
+
+# Packaging staging, cache, and distributable artifacts.
+/dist/
+/.flatpak-builder/
+/.flatpak-build/
+/flatpak-repo/
+/AppDir/
+/build/
+/*.AppImage
+/*.AppImage.zsync
+/*.flatpak
+/*.flatpakref
+/*.flatpakrepo
+*.part
+*.partial
+
+# Local Cargo vendor/cache configuration. Do not exclude Cargo.lock.
+/vendor/
+/.cargo/
+
+# Locally generated example exports; do not blanket-ignore all PDFs or images.
+/print-layout.pdf
+/print-pages/
+/print-job.json
+/cropped.pdf
+/borderless.pdf
+/final.pdf
+
+# IDE / operating system / editor temporary files.
+/.idea/
+/.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Developer-local secrets and credentials.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Generated Linux application metadata; templates (*.in) are tracked.
+/packaging/desktop/*.desktop
+/packaging/desktop/*.metainfo.xml
+
+# Python metadata helper and tests (Python 3.11+).
+__pycache__/
+*.py[cod]
+
+# Local Flatpak signing material (never commit private signing keys).
+/signing-key.asc
+/signing-key.gpg
+/flatpak-signing-private.*
+/flatpak-pages-local/

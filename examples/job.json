@@ -1,0 +1,52 @@
+{
+  "page": { "width_mm": 210.0, "height_mm": 297.0 },
+  "layout": {
+    "type": "grid",
+    "rows": 2,
+    "columns": 2,
+    "margin_mm": 5.0,
+    "gap_mm": 3.0
+  },
+  "photos": [
+    {
+      "path": "/absolute/path/to/photo1.jpg",
+      "copies": 2,
+      "rotation": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "crop": { "mode": "fill", "focal_x": 0.5, "focal_y": 0.5, "zoom": 1.0 },
+      "caption_override": null
+    },
+    {
+      "path": "/absolute/path/to/photo2.png",
+      "copies": 2,
+      "rotation": 90,
+      "flip_h": false,
+      "flip_v": false,
+      "crop": { "mode": "fit", "focal_x": 0.5, "focal_y": 0.5, "zoom": 1.0 },
+      "caption_override": null
+    }
+  ],
+  "dpi": 300,
+  "auto_rotate": true,
+  "disable_crop": false,
+  "background": "#FFFFFF",
+  "caption": {
+    "kind": "custom",
+    "custom": "{filename} - {date}",
+    "font_family": "Sans",
+    "font_file": null,
+    "size_pt": 10.0,
+    "text_color": "#FFFFFF",
+    "backdrop_opacity": 160
+  },
+  "output": {
+    "target": "pdf",
+    "path": "print-layout.pdf",
+    "image_format": "png",
+    "jpeg_quality": 95,
+    "conflict": "overwrite",
+    "open_folder": false,
+    "printer_name": null
+  }
+}

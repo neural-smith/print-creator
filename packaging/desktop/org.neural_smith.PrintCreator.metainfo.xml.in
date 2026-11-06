@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component type="desktop-application">
+  <id>@APP_ID@</id>
+  <name>@APP_NAME@</name>
+  <summary>Arrange photographs for printing and PDF export</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>@LICENSE_XML@</project_license>
+  <developer_name>@AUTHOR_XML@</developer_name>
+  <description>
+    <p>Print Creator is a standalone photo print-layout application with PDF export and digiKam-compatible layouts.</p>
+  </description>
+  <launchable type="desktop-id">@APP_ID@.desktop</launchable>
+  <categories><category>Graphics</category><category>Photography</category></categories>
+</component>

@@ -1,0 +1,100 @@
+name: Rust checks and Linux packages
+
+on:
+  # Only branch pushes run normal CI. Tags are handled by release.yml,
+  # which calls this same workflow to avoid running builds twice.
+  push:
+    branches:
+      - '**'
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libx11-dev libasound2-dev libssl-dev
+      - name: Check desktop and CLI
+        run: cargo check --all-targets --all-features
+      - name: Run tests
+        run: cargo test --all-features
+      - name: Headless CLI build
+        run: cargo check --no-default-features
+      - name: Verify shell packaging scripts
+        run: bash -n scripts/*.sh
+      - name: Verify author metadata and Flatpak Pages index generation
+        run: python3 -m unittest discover -s tests -p "test_*.py"
+
+  packages:
+    runs-on: ubuntu-24.04
+    # Build provenance is signed only for tagged releases (never on fork PRs).
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install packaging dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            flatpak flatpak-builder patchelf desktop-file-utils file curl \
+            pkg-config libxkbcommon-dev libwayland-dev libx11-dev \
+            libasound2-dev libssl-dev libfuse2t64
+          flatpak remote-add --user --if-not-exists \
+            flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+      - name: Validate desktop integration
+        run: |
+          python3 scripts/generate-metadata.py --output-dir dist/desktop
+          desktop-file-validate dist/desktop/org.neural_smith.PrintCreator.desktop
+          python3 -c "import xml.etree.ElementTree as ET; ET.parse('dist/desktop/org.neural_smith.PrintCreator.metainfo.xml')"
+      - name: Build Flatpak and AppImage
+        run: ./scripts/build-all.sh
+      - name: Confirm both Linux packages exist
+        shell: bash
+        run: |
+          shopt -s nullglob
+          flatpaks=(dist/packages/*.flatpak)
+          appimages=(dist/packages/*.AppImage)
+          [[ ${#flatpaks[@]} -gt 0 && ${#appimages[@]} -gt 0 ]]
+          ls -lh "${flatpaks[@]}" "${appimages[@]}"
+      - name: Generate and verify package checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          flatpaks=(dist/packages/*.flatpak)
+          appimages=(dist/packages/*.AppImage)
+          if (( ${#flatpaks[@]} != 1 || ${#appimages[@]} != 1 )); then
+            echo 'Expected exactly one Flatpak and one AppImage' >&2
+            exit 1
+          fi
+          (cd dist/packages && sha256sum -- *.flatpak *.AppImage > SHA256SUMS)
+          (cd dist/packages && sha256sum --check SHA256SUMS)
+      - name: Attest Linux release artifacts (signed SLSA build provenance)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/attest@v4
+        with:
+          subject-path: 'dist/packages/*'
+      - name: Upload Linux packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: print-creator-linux-x86_64
+          path: |
+            dist/packages/*.flatpak
+            dist/packages/*.AppImage
+            dist/packages/SHA256SUMS
+          if-no-files-found: error
