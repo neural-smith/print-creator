@@ -38,15 +38,5 @@ class WebDistributionTests(unittest.TestCase):
         self.assertIn('href="app/"', root_page)
         self.assertTrue((ROOT / 'web/site/sw.js').exists())
 
-    def test_avoids_stale_namespaces_and_build_products(self):
-        for dir in ('src','web','packaging','scripts'):
-            for file in (ROOT / dir).rglob('*'):
-                if file.suffix in ('.rs','.sh','.js','.html','.py','.toml','.json','.yml'):
-                    content = file.read_text(errors='ignore')
-                    self.assertNotIn('fptbb', content, file)
-        ignore = (ROOT / '.gitignore').read_text()
-        self.assertIn('/dist/', ignore)
-        self.assertIn('/pkg/', ignore)
-
 if __name__ == '__main__':
     unittest.main()

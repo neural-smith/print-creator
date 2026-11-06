@@ -7,12 +7,11 @@
 **A standalone photo-layout and print-export application for Linux, written in Rust.**
 Inspired by digiKam's Print Creator, with compatible XML photo templates, a native desktop interface, and a scriptable CLI. No digiKam library, photo database, Qt, or KDE installation is needed.
 
-- **Version:** 0.5.0
 - **Application ID:** `org.neural_smith.PrintCreator` (the public organization name is `neural-smith`)
 - **Executable / Cargo package:** `print-creator`
 - **Author:** configured in [`Cargo.toml`](Cargo.toml), not duplicated across package metadata
 - **License:** GPL-2.0-or-later (see [LICENSE](LICENSE))
-- **Platforms:** Linux x86_64 (Flatpak, AppImage, native build); other architectures may be built from source
+- **Platforms:** Linux x86_64 and aarch64 (Flatpak, AppImage, standalone ELF); WebAssembly browser app
 
 > **Project scope:** This is an independent Rust implementation, not an official digiKam/KDE product. The adaptive algorithm and color-management behavior are not exact replicas of digiKam.
 
@@ -411,3 +410,7 @@ optimizations, including LTO, remain enabled. The `.wasm` file may be larger.
 
 Build again using `bash scripts/build-web.sh`. This is not a reason to
 disable Rust bulk-memory features or change your existing CLI flags.
+
+## ARM64 and multi-architecture publishing
+
+The release workflow uses native x86_64 and aarch64 runners and publishes six Linux assets (Flatpak, AppImage and ELF for each). The signed GitHub Pages Flatpak repository contains both architectures, and the same `.flatpakref` installs the correct one. Each architecture performs **one** optimized native Cargo build reused by all three packagers. The WebAssembly build is separate. See [DEPLOYMENT.md](DEPLOYMENT.md) for CI setup, trust-chain rules, tag publishing and smoke tests.

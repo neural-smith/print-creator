@@ -86,7 +86,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          (cd dist/packages && sha256sum --check --strict SHA256SUMS)
+          (cd dist/packages && sha256sum --check --strict SHA256SUMS-x86_64)
           owner="${GITHUB_REPOSITORY%%/*}"
           repository="${GITHUB_REPOSITORY#*/}"
           owner="${owner,,}"
@@ -101,21 +101,29 @@ jobs:
           echo "url=${url%/}/" >> "$GITHUB_OUTPUT"
         env:
           FLATPAK_PAGES_URL: ${{ vars.FLATPAK_PAGES_URL }}
-      - name: Download the built Flatpak OSTree repository from this run
+      - name: Download both prebuilt Flatpak OSTree repositories
         uses: actions/download-artifact@v4
         with:
-          name: print-creator-flatpak-ostree-x86_64
+          pattern: print-creator-flatpak-ostree-*
           path: dist/built-flatpak
-      - name: Restore the native Flatpak build repository
+          merge-multiple: false
+      - name: Restore both native Flatpak build repositories
         shell: bash
         run: |
           set -euo pipefail
-          source_repo="${RUNNER_TEMP}/print-creator-built-repo"
-          mkdir -p "$source_repo"
-          tar -xzf dist/built-flatpak/flatpak-ostree-repo.tar.gz -C "$source_repo"
-          test -s "$source_repo/config"
-          ostree --repo="$source_repo" rev-parse app/org.neural_smith.PrintCreator/x86_64/master
-          echo "BUILT_REPO_DIR=$source_repo" >> "$GITHUB_ENV"
+          for arch in x86_64 aarch64; do
+            archive="dist/built-flatpak/print-creator-flatpak-ostree-${arch}/flatpak-ostree-repo.tar.gz"
+            test -s "$archive"
+            source_repo="${RUNNER_TEMP}/print-creator-built-${arch}"
+            mkdir -p "$source_repo"
+            tar -xzf "$archive" -C "$source_repo"
+            test -s "$source_repo/config"
+            ostree --repo="$source_repo" rev-parse "app/org.neural_smith.PrintCreator/${arch}/master"
+            case "$arch" in
+              x86_64) echo "BUILT_REPO_X86_64=$source_repo" >> "$GITHUB_ENV" ;;
+              aarch64) echo "BUILT_REPO_AARCH64=$source_repo" >> "$GITHUB_ENV" ;;
+            esac
+          done
       - name: Import dedicated Flatpak signing key
         env:
           # Prefer ASCII armor: no extra Base64 encoding or padding to break.
@@ -160,7 +168,7 @@ jobs:
         run: |
           set -euo pipefail
           # Import the actual flatpak-builder OSTree ref, not the .flatpak bundle.
-          bash ./scripts/update-flatpak-pages.sh "$PAGES_WORKTREE" "$BUILT_REPO_DIR" "$REPOSITORY_URL"
+          bash ./scripts/update-flatpak-pages.sh "$PAGES_WORKTREE" "$BUILT_REPO_X86_64" "$REPOSITORY_URL" "aarch64:$BUILT_REPO_AARCH64"
           # GitHub Pages published-site hard limit: 1 GB.
           bytes="$(du -sb "$PAGES_WORKTREE" | cut -f1)"
           if (( bytes > 950000000 )); then
@@ -199,26 +207,32 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download Flatpak and AppImage from this run
+      - name: Download both architectures without rebuilding
         uses: actions/download-artifact@v4
         with:
-          name: print-creator-linux-x86_64
+          pattern: print-creator-linux-*
           path: dist/packages
+          merge-multiple: true
 
-      - name: Verify downloaded packages against build-time checksums
+      - name: Verify each architecture and assemble one release checksum file
         shell: bash
         run: |
           set -euo pipefail
           shopt -s nullglob
-          flatpaks=(dist/packages/*.flatpak)
-          appimages=(dist/packages/*.AppImage)
-          binaries=(dist/packages/PrintCreator-*-linux)
-          if (( ${#flatpaks[@]} != 1 || ${#appimages[@]} != 1 || ${#binaries[@]} != 1 )); then
-            echo 'Expected exactly one Flatpak, one AppImage and one standalone binary:' >&2
-            ls -lah dist/packages/ >&2 || true
-            exit 1
-          fi
-          [[ -s dist/packages/SHA256SUMS ]] || { echo 'Missing build-time checksums' >&2; exit 1; }
+          for arch in x86_64 aarch64; do
+            flatpaks=(dist/packages/PrintCreator-*-${arch}.flatpak)
+            appimages=(dist/packages/PrintCreator-*-${arch}.AppImage)
+            binaries=(dist/packages/PrintCreator-*-${arch}-linux)
+            if (( ${#flatpaks[@]} != 1 || ${#appimages[@]} != 1 || ${#binaries[@]} != 1 )); then
+              echo "Missing release artifact(s) for $arch" >&2
+              ls -lah dist/packages >&2 || true
+              exit 1
+            fi
+            test -s "dist/packages/SHA256SUMS-$arch"
+            (cd dist/packages && sha256sum --check --strict "SHA256SUMS-$arch")
+          done
+          cat dist/packages/SHA256SUMS-x86_64 dist/packages/SHA256SUMS-aarch64 > dist/packages/SHA256SUMS
+          rm -f dist/packages/SHA256SUMS-x86_64 dist/packages/SHA256SUMS-aarch64
           (cd dist/packages && sha256sum --check --strict SHA256SUMS)
           ls -lh dist/packages/*
 

@@ -48,7 +48,14 @@ jobs:
         run: python3 -m unittest discover -s tests -p "test_*.py"
 
   packages:
-    runs-on: ubuntu-24.04
+    name: Package ${{ matrix.variant.arch }} on ${{ matrix.variant.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - {arch: x86_64, runner: ubuntu-24.04}
+          - {arch: aarch64, runner: ubuntu-24.04-arm}
+    runs-on: ${{ matrix.variant.runner }}
     # Build provenance is signed only for tagged releases (never on fork PRs).
     permissions:
       contents: read
@@ -67,6 +74,16 @@ jobs:
             libasound2-dev libssl-dev libfuse2t64
           flatpak remote-add --user --if-not-exists \
             flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+      - name: Verify native runner matches target architecture
+        shell: bash
+        env:
+          EXPECTED_ARCH: ${{ matrix.variant.arch }}
+        run: |
+          set -euo pipefail
+          [[ "$(uname -m)" == "$EXPECTED_ARCH" ]] || {
+            echo "Wrong runner CPU: expected $EXPECTED_ARCH, got $(uname -m)" >&2
+            exit 1
+          }
       - name: Validate desktop integration
         run: |
           python3 scripts/generate-metadata.py --output-dir dist/desktop
@@ -97,20 +114,20 @@ jobs:
             echo 'Expected exactly one Flatpak, one AppImage and one standalone binary' >&2
             exit 1
           fi
-          (cd dist/packages && sha256sum -- *.flatpak *.AppImage *-linux > SHA256SUMS)
-          (cd dist/packages && sha256sum --check SHA256SUMS)
+          (cd dist/packages && sha256sum -- *.flatpak *.AppImage *-linux > "SHA256SUMS-$(uname -m)")
+          (cd dist/packages && sha256sum --check "SHA256SUMS-$(uname -m)")
       - name: Archive the already-built unsigned Flatpak OSTree repository
         shell: bash
         run: |
           set -euo pipefail
           test -s dist/flatpak-repo/config
-          ostree --repo=dist/flatpak-repo rev-parse app/org.neural_smith.PrintCreator/x86_64/master
+          ostree --repo=dist/flatpak-repo rev-parse app/org.neural_smith.PrintCreator/$(uname -m)/master
           tar -C dist/flatpak-repo -czf dist/flatpak-ostree-repo.tar.gz .
           tar -tzf dist/flatpak-ostree-repo.tar.gz > /dev/null
       - name: Upload Flatpak OSTree repository for Pages (not a public release asset)
         uses: actions/upload-artifact@v4
         with:
-          name: print-creator-flatpak-ostree-x86_64
+          name: print-creator-flatpak-ostree-${{ matrix.variant.arch }}
           path: dist/flatpak-ostree-repo.tar.gz
           if-no-files-found: error
           retention-days: 7
@@ -122,10 +139,10 @@ jobs:
       - name: Upload Linux packages
         uses: actions/upload-artifact@v4
         with:
-          name: print-creator-linux-x86_64
+          name: print-creator-linux-${{ matrix.variant.arch }}
           path: |
             dist/packages/*.flatpak
             dist/packages/*.AppImage
             dist/packages/*-linux
-            dist/packages/SHA256SUMS
+            dist/packages/SHA256SUMS-*
           if-no-files-found: error

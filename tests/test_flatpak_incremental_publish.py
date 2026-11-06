@@ -56,7 +56,8 @@ if name == "flatpak":
     if cmd == "build-sign":
         assert "--gpg-sign=" + os.environ["MOCK_FINGERPRINT"] in args
         repo = pathlib.Path(args[-3])
-        assert (repo / "refs/heads/app/org.neural_smith.PrintCreator/x86_64/master").is_file()
+        arch = next(a.split('=', 1)[1] for a in args if a.startswith('--arch='))
+        assert (repo / 'refs/heads/app/org.neural_smith.PrintCreator' / arch / 'master').is_file()
         (repo / "mock-commit-signature").write_text(os.environ["MOCK_FINGERPRINT"])
     elif cmd == "build-update-repo":
         assert "--gpg-sign=" + os.environ["MOCK_FINGERPRINT"] in args
@@ -121,6 +122,29 @@ class FlatpakIncrementalPublishTest(unittest.TestCase):
         self.assertNotIn("build-import-bundle", log)
         self.assertEqual(log.count("ostree --repo=" + str(self.pages) + " pull-local "), 2)
         self.assertEqual(log.count("flatpak build-sign "), 2)
+
+    def test_two_architectures_sign_and_publish_single_summary(self):
+        built_x64 = self.base / 'built-x64'
+        built_arm = self.base / 'built-arm'
+        for built, arch in ((built_x64, 'x86_64'), (built_arm, 'aarch64')):
+            ref = f'app/org.neural_smith.PrintCreator/{arch}/master'
+            target = built / 'refs/heads' / ref
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(hashlib.sha256(arch.encode()).hexdigest())
+            (built / 'config').write_text('[core]\nmode=archive-z2\n')
+        url = 'https://neural-smith.github.io/print-creator/'
+        result = subprocess.run(['bash', str(SCRIPT), str(self.pages), str(built_x64),
+                                 url, 'aarch64:' + str(built_arm)],
+                                env=self.env, text=True, capture_output=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for arch in ('x86_64', 'aarch64'):
+            self.assertTrue((self.pages / 'refs/heads/app/org.neural_smith.PrintCreator' / arch / 'master').is_file())
+        log = self.log.read_text()
+        self.assertEqual(log.count('flatpak build-sign '), 2)
+        self.assertEqual(log.count('flatpak build-update-repo '), 1)
+        self.assertIn('--arch=x86_64', log)
+        self.assertIn('--arch=aarch64', log)
+        self.assertEqual((self.pages / 'app/index.html').read_text(), 'keep browser app')
 
     def test_key_rotation_rejected_before_mutation(self):
         result = self.publish("0.5.0")
