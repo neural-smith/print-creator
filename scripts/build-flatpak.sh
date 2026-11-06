@@ -22,7 +22,7 @@ mkdir -p "$SRC/.cargo"
 (cd "$SRC" && cargo vendor --locked vendor > .cargo/config.toml)
 # Include the static UPX binary in the source: Flatpak's SDK cannot use the
 # host's ordinary /usr/bin/upx, and the sandbox build has no network access.
-"$ROOT/scripts/prepare-upx.sh" "$SRC/tools/upx"
+bash "$ROOT/scripts/prepare-upx.sh" "$SRC/tools/upx"
 cp "$ROOT/packaging/flatpak/${ID}.json" "$STAGE/${ID}.json"
 flatpak-builder --user --force-clean --install-deps-from=flathub \
   --repo="$REPO" "$STAGE/build" "$STAGE/${ID}.json"

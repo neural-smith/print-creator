@@ -4,18 +4,29 @@ pub mod layout;
 pub mod metadata;
 pub mod render;
 pub mod pdf;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod output;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod paths;
-#[cfg(feature="gui")]
+#[cfg(any(feature="gui", feature="web"))]
 pub mod theme;
-#[cfg(feature="gui")]
+#[cfg(all(feature="gui", not(target_arch="wasm32")))]
 pub mod gui;
+#[cfg(all(feature="web", target_arch="wasm32"))]
+pub mod web_assets;
+#[cfg(all(feature="web", target_arch="wasm32"))]
+pub mod web_output;
+#[cfg(all(feature="web", target_arch="wasm32"))]
+pub mod web_app;
 
+#[cfg(not(target_arch="wasm32"))]
 use std::path::PathBuf;
+#[cfg(not(target_arch="wasm32"))]
 use walkdir::WalkDir;
 
 /// Recursively collect local photo files, maintaining caller order. Filenames are
 /// passed straight to the image decoder; unsupported RAW variants need dcraw.
+#[cfg(not(target_arch="wasm32"))]
 pub fn collect_images(paths: &[PathBuf]) -> Vec<PathBuf> {
     fn supported(p: &std::path::Path) -> bool {
         let extension = p.extension().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
@@ -42,12 +53,13 @@ pub fn collect_images(paths: &[PathBuf]) -> Vec<PathBuf> {
 
 pub mod native_pdf;
 
+#[cfg(not(target_arch = "wasm32"))]
 pub mod cli_export;
 pub const APP_ID: &str = "org.neural_smith.PrintCreator";
 /// Name shown in the GUI and KDE window title.
 pub const APP_NAME: &str = "Print Creator";
 
-#[cfg(test)]
+#[cfg(all(test, not(target_arch="wasm32")))]
 mod image_import_tests {
     use super::*;
     #[test]

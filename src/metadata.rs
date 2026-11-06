@@ -1,4 +1,8 @@
-use std::{collections::BTreeMap, fs::File, io::BufReader, path::Path, process::Command};
+use std::{collections::BTreeMap, path::Path};
+#[cfg(not(target_arch="wasm32"))]
+use std::{fs::File, io::BufReader, process::Command};
+#[cfg(target_arch="wasm32")]
+use std::io::Cursor;
 use anyhow::{Context, Result};
 use image::DynamicImage;
 
@@ -12,8 +16,16 @@ pub struct PhotoMetadata {
 
 pub fn read(path: &Path) -> PhotoMetadata {
     let mut metadata = PhotoMetadata { orientation: 1, ..PhotoMetadata::default() };
-    let Ok(file) = File::open(path) else { return metadata };
-    let Ok(exif) = exif::Reader::new().read_from_container(&mut BufReader::new(file)) else { return metadata };
+    #[cfg(not(target_arch="wasm32"))]
+    let exif_result = File::open(path)
+        .map(BufReader::new)
+        .ok()
+        .and_then(|mut reader| exif::Reader::new().read_from_container(&mut reader).ok());
+    #[cfg(target_arch="wasm32")]
+    let exif_result = crate::web_assets::get(path).and_then(|bytes| {
+        exif::Reader::new().read_from_container(&mut Cursor::new(bytes)).ok()
+    });
+    let Some(exif) = exif_result else { return metadata };
     for field in exif.fields() {
         metadata.exif.insert(format!("{:?}", field.tag), field.display_value().to_string());
     }
@@ -35,6 +47,29 @@ pub fn read(path: &Path) -> PhotoMetadata {
     metadata
 }
 
+pub fn photo_is_available(path: &Path) -> bool {
+    #[cfg(target_arch="wasm32")]
+    { crate::web_assets::contains(path) }
+    #[cfg(not(target_arch="wasm32"))]
+    { path.is_file() }
+}
+
+pub fn photo_dimensions(path: &Path) -> Result<(u32,u32)> {
+    #[cfg(target_arch="wasm32")]
+    { image::load_from_memory(&crate::web_assets::get(path).ok_or_else(|| anyhow::anyhow!("missing photo"))?)
+        .map(|image| (image.width(),image.height())).map_err(Into::into) }
+    #[cfg(not(target_arch="wasm32"))]
+    { image::image_dimensions(path).map_err(Into::into) }
+}
+
+#[cfg(target_arch="wasm32")]
+pub fn open_photo(path: &Path) -> Result<DynamicImage> {
+    let bytes = crate::web_assets::get(path)
+        .ok_or_else(|| anyhow::anyhow!("missing imported image: {}",path.display()))?;
+    image::load_from_memory(&bytes).context("decoding browser photo")
+}
+
+#[cfg(not(target_arch="wasm32"))]
 pub fn open_photo(path: &Path) -> Result<DynamicImage> {
     match image::open(path) {
         Ok(img) => Ok(img),

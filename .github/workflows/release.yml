@@ -44,9 +44,15 @@ jobs:
       attestations: write
       artifact-metadata: write
 
+  build-web:
+    name: Build browser editor for Pages
+    needs: validate-tag
+    if: ${{ vars.FLATPAK_PAGES_ENABLED == 'true' }}
+    uses: ./.github/workflows/web.yml
+
   publish-flatpak-pages:
-    name: Publish signed Flatpak remote on GitHub Pages
-    needs: build-linux
+    name: Publish signed Flatpak remote and web editor on GitHub Pages
+    needs: [build-linux, build-web]
     # Opt-in so the existing immutable release workflow keeps working until
     # Pages and its dedicated GPG key have been explicitly configured.
     if: ${{ vars.FLATPAK_PAGES_ENABLED == 'true' }}
@@ -97,21 +103,12 @@ jobs:
           FLATPAK_PAGES_URL: ${{ vars.FLATPAK_PAGES_URL }}
       - name: Import dedicated Flatpak signing key
         env:
+          # Prefer ASCII armor: no extra Base64 encoding or padding to break.
+          FLATPAK_SIGNING_KEY: ${{ secrets.FLATPAK_SIGNING_KEY }}
+          # Legacy secret remains supported for existing repositories.
           FLATPAK_SIGNING_KEY_B64: ${{ secrets.FLATPAK_SIGNING_KEY_B64 }}
         shell: bash
-        run: |
-          set -euo pipefail
-          [[ -n "${FLATPAK_SIGNING_KEY_B64:-}" ]] || {
-            echo 'Set the encrypted FLATPAK_SIGNING_KEY_B64 Actions secret first.' >&2
-            exit 1
-          }
-          export GNUPGHOME="${RUNNER_TEMP}/print-creator-gnupg"
-          install -d -m 700 "$GNUPGHOME"
-          printf '%s' "$FLATPAK_SIGNING_KEY_B64" | base64 --decode | gpg --batch --import
-          fingerprint="$(gpg --batch --with-colons --list-secret-keys | awk -F: '$1 == "fpr" {print $10; exit}')"
-          [[ -n "$fingerprint" ]] || { echo 'No secret GPG signing key was imported' >&2; exit 1; }
-          echo "GNUPGHOME=${GNUPGHOME}" >> "$GITHUB_ENV"
-          echo "FLATPAK_GPG_KEY_ID=${fingerprint}" >> "$GITHUB_ENV"
+        run: bash ./scripts/import-flatpak-signing-key.sh
       - name: Restore persistent OSTree history from gh-pages branch
         shell: bash
         run: |
@@ -126,6 +123,21 @@ jobs:
             git -C "$pages" switch --orphan gh-pages
           fi
           echo "PAGES_WORKTREE=${pages}" >> "$GITHUB_ENV"
+      - name: Download browser app built by shared CI workflow
+        uses: actions/download-artifact@v4
+        with:
+          name: print-creator-web
+          path: dist/web/app
+      - name: Add browser editor to GitHub Pages without touching Flatpak objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s dist/web/app/pkg/print_creator_bg.wasm
+          mkdir -p "$PAGES_WORKTREE/app"
+          # Only /app is replaced; OSTree objects, summaries and keys survive.
+          find "$PAGES_WORKTREE/app" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+          cp -a dist/web/app/. "$PAGES_WORKTREE/app/"
+          touch "$PAGES_WORKTREE/.nojekyll"
       - name: Sign, import and publish an updated Flatpak repository
         env:
           REPOSITORY_URL: ${{ steps.repo_url.outputs.url }}
@@ -135,7 +147,7 @@ jobs:
           shopt -s nullglob
           bundles=(dist/packages/*.flatpak)
           (( ${#bundles[@]} == 1 )) || { echo 'Expected exactly one Flatpak bundle' >&2; exit 1; }
-          ./scripts/update-flatpak-pages.sh "$PAGES_WORKTREE" "${bundles[0]}" "$REPOSITORY_URL"
+          bash ./scripts/update-flatpak-pages.sh "$PAGES_WORKTREE" "${bundles[0]}" "$REPOSITORY_URL"
           # GitHub Pages published-site hard limit: 1 GB.
           bytes="$(du -sb "$PAGES_WORKTREE" | cut -f1)"
           if (( bytes > 950000000 )); then

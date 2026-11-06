@@ -53,7 +53,10 @@ GPGKey={key_b64}
 body {{max-width:48rem;margin:4rem auto;padding:0 1.5rem;line-height:1.6}}
 a {{color:#74c7ec}}code {{overflow-wrap:anywhere}}
 </style></head><body>
-<h1>Print Creator</h1><p>Signed, automatically updatable Flatpak packages.</p>
+<h1>Print Creator</h1>
+<p>Arrange photographs and create printable PDFs locally in your browser, or install the Linux application.</p>
+<p><a href="app/">Open Print Creator in your browser</a></p>
+<p>Signed, automatically updatable Flatpak packages.</p>
 <p><a href="{escape(APP_ID)}.flatpakref">Install Print Creator (.flatpakref)</a></p>
 <p><a href="index.flatpakrepo">Add repository (.flatpakrepo)</a></p>
 <pre><code>flatpak install --user {escape(base_url + APP_ID + '.flatpakref')}</code></pre>

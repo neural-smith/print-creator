@@ -58,3 +58,8 @@ __pycache__/
 /signing-key.gpg
 /flatpak-signing-private.*
 /flatpak-pages-local/
+
+# Browser/WASM release staging.
+/pkg/
+/web/pkg/
+/dist/web/

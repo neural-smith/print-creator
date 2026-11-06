@@ -1,0 +1,40 @@
+name: WebAssembly browser build
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build-web:
+    name: Build Print Creator Web
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack@0.15
+      - name: Build WebAssembly from the shared Rust source
+        run: bash ./scripts/build-web.sh
+      - name: Validate browser bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s dist/web/app/pkg/print_creator_bg.wasm
+          test -s dist/web/app/pkg/print_creator.js
+          test -s dist/web/app/index.html
+          test -s dist/web/app/sw.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: print-creator-web
+          path: dist/web/app/
+          if-no-files-found: error

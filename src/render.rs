@@ -1,7 +1,10 @@
+#[cfg(not(target_arch="wasm32"))]
 use std::{path::PathBuf, process::Command};
 use anyhow::{bail, Context, Result};
+#[cfg(not(target_arch="wasm32"))]
 use ab_glyph::FontArc;
 use image::{imageops::{self, FilterType}, DynamicImage, GenericImageView, Rgba, RgbaImage};
+#[cfg(not(target_arch="wasm32"))]
 use imageproc::drawing::{draw_text_mut, text_size};
 use crate::{layout, metadata, model::{self, CropMode, PrintJob, RectMm}};
 
@@ -34,6 +37,7 @@ pub fn render_page(job: &PrintJob, page_index: usize, dpi: u32) -> Result<RgbaIm
     let chosen = &photo_ids[offset..(offset+capacity).min(photo_ids.len())];
     let photos = chosen.iter().map(|&i| &job.photos[i]).collect::<Vec<_>>();
     let rectangles = layout::job_slots(job, &photos)?;
+    #[cfg(not(target_arch="wasm32"))]
     let font = if chosen.iter().any(|&i| job.photos[i].caption_override.is_some())
         || job.caption.kind != model::CaptionType::None
         { Some(load_caption_font(job)?) } else { None };
@@ -54,10 +58,18 @@ pub fn render_page(job: &PrintJob, page_index: usize, dpi: u32) -> Result<RgbaIm
         let ox = x + (sw-iw)/2;
         let oy = y + (sh-ih)/2;
         imageops::overlay(&mut page, &image, ox.into(), oy.into());
+        #[cfg(not(target_arch="wasm32"))]
         if let Some(font) = &font {
             let text = metadata::display_caption(photo, job, offset + slot, size, &md);
             if !text.trim().is_empty() {
                 render_caption(&mut page, (x,y,sw,sh), &text, font, job, dpi)?;
+            }
+        }
+        #[cfg(target_arch="wasm32")]
+        {
+            let text = metadata::display_caption(photo, job, offset + slot, size, &md);
+            if !text.trim().is_empty() {
+                render_web_caption(&mut page, (x,y,sw,sh), &text, job, dpi, false)?;
             }
         }
     }
@@ -91,6 +103,7 @@ fn fit_or_crop(src: DynamicImage, target_w: u32, target_h: u32, mode: CropMode,
     }
 }
 
+#[cfg(not(target_arch="wasm32"))]
 fn load_caption_font(job: &PrintJob) -> Result<FontArc> {
     let mut candidates = Vec::<PathBuf>::new();
     if let Some(p) = &job.caption.font_file { candidates.push(p.clone()); }
@@ -116,6 +129,7 @@ fn load_caption_font(job: &PrintJob) -> Result<FontArc> {
     bail!("no TrueType/OpenType caption font found; set caption.font_file to a font on this system")
 }
 
+#[cfg(not(target_arch="wasm32"))]
 fn render_caption(page: &mut RgbaImage, slot: (u32,u32,u32,u32), text: &str,
                   font: &FontArc, job: &PrintJob, dpi: u32) -> Result<()> {
     let (x,y,w,h) = slot;
@@ -184,6 +198,7 @@ mod tests {
 
 /// Create a transparent caption overlay for native-resolution PDF pages.
 /// Only the overlay, never the photo, is rasterized at the requested DPI.
+#[cfg(not(target_arch="wasm32"))]
 pub(crate) fn caption_overlay(job: &PrintJob, text: &str, width: u32, height: u32) -> Result<RgbaImage> {
     let font = load_caption_font(job)?;
     let mut layer = RgbaImage::from_pixel(width, height, Rgba([0, 0, 0, 0]));
@@ -228,4 +243,61 @@ pub(crate) fn caption_overlay(job: &PrintJob, text: &str, width: u32, height: u3
             x as i32, y as i32, font_px, &font, &line);
     }
     Ok(layer)
+}
+
+/// The WASM build cannot read system font files. Render lightweight 8x8 bitmap
+/// captions instead; full system-font selection remains a desktop-only feature.
+#[cfg(target_arch="wasm32")]
+fn render_web_caption(page: &mut RgbaImage, slot: (u32,u32,u32,u32), text: &str,
+                      job: &PrintJob, dpi: u32, overlay: bool) -> Result<()> {
+    use font8x8::{UnicodeFonts, BASIC_FONTS};
+    let (x,y,w,h)=slot;
+    let scale = ((job.caption.size_pt*dpi as f32/72.0)/8.0).round().clamp(1.0,8.0) as u32;
+    let char_w=8*scale;
+    let char_h=8*scale;
+    let max_chars=(w.saturating_sub(10)/(char_w.max(1))) as usize;
+    if max_chars==0 || h<char_h+6 {return Ok(());}
+    let short = text.lines().next().unwrap_or("").chars().take(max_chars).collect::<String>();
+    if short.is_empty() {return Ok(());}
+    let bar_h=(char_h+8).min(h);
+    let rgb=model::parse_color(&job.caption.text_color)?;
+    for py in y+h-bar_h..y+h {
+        for px in x..x+w {
+            if overlay {
+                *page.get_pixel_mut(px,py)=Rgba([0,0,0,job.caption.backdrop_opacity]);
+            } else {
+                let p=page.get_pixel_mut(px,py);
+                let a=job.caption.backdrop_opacity as u16;
+                for c in 0..3 {p.0[c]=((p.0[c] as u16*(255-a))/255) as u8;}
+            }
+        }
+    }
+    let tx=x+(w-(short.chars().count() as u32*char_w).min(w))/2;
+    let ty=y+h-bar_h+4;
+    for (i,c) in short.chars().enumerate() {
+        let glyph=BASIC_FONTS.get(c).or_else(||BASIC_FONTS.get('?'));
+        if let Some(rows)=glyph {
+            for (dy,bits) in rows.iter().enumerate() {
+                for dx in 0..8 {
+                    if ((*bits >> dx) & 1) == 1 {
+                        for sy in 0..scale {for sx in 0..scale {
+                            let px=tx+i as u32*char_w+dx*scale+sx;
+                            let py=ty+dy as u32*scale+sy;
+                            if px<x+w && py<y+h {
+                                *page.get_pixel_mut(px,py)=Rgba([rgb[0],rgb[1],rgb[2],255]);
+                            }
+                        }}
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(target_arch="wasm32")]
+pub(crate) fn caption_overlay(job: &PrintJob, text: &str, width: u32, height: u32) -> Result<RgbaImage> {
+    let mut page=RgbaImage::from_pixel(width,height,Rgba([0,0,0,0]));
+    render_web_caption(&mut page,(0,0,width,height),text,job,job.dpi,true)?;
+    Ok(page)
 }

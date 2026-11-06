@@ -184,7 +184,10 @@ impl Default for Output {
     fn default() -> Self {
         Self {
             target: OutputTarget::Pdf,
-            path: crate::paths::default_pdf_path(),
+            path: {
+                #[cfg(not(target_arch="wasm32"))] { crate::paths::default_pdf_path() }
+                #[cfg(target_arch="wasm32")] { PathBuf::from("print-layout.pdf") }
+            },
             image_format: ImageFormat::Png,
             jpeg_quality: 95,
             preserve_original_quality: false,
@@ -238,7 +241,9 @@ impl PrintJob {
             bail!("maximum total image copies per job is 10000");
         }
         for p in &self.photos {
-            if p.path.as_os_str().is_empty() || !p.path.is_file() { bail!("missing image: {}", p.path.display()); }
+            if p.path.as_os_str().is_empty() || !crate::metadata::photo_is_available(&p.path) {
+                bail!("missing image: {}", p.path.display());
+            }
             if p.rotation.rem_euclid(90) != 0 { bail!("photo rotation must be divisible by 90"); }
             if !p.crop.zoom.is_finite() || !(1.0..=10.0).contains(&p.crop.zoom)
                 || !p.crop.focal_x.is_finite() || !p.crop.focal_y.is_finite()

@@ -36,7 +36,7 @@ APPIMAGE_EXTRACT_AND_RUN=1 "$DEPLOY" --appdir "$APPDIR" \
 [[ -f "$APPDIR/AppRun" ]] || { echo 'linuxdeploy did not create AppRun.' >&2; exit 1; }
 # Compress the deployed executable, *after* dependency harvesting and *before*
 # the final AppImage squashfs is generated. Keep the Cargo binary unchanged.
-"$ROOT/scripts/prepare-upx.sh" "$BUILD/tools/upx"
+bash "$ROOT/scripts/prepare-upx.sh" "$BUILD/tools/upx"
 BIN="$APPDIR/usr/bin/print-creator"
 BEFORE="$(stat -c%s "$BIN")"
 "$BUILD/tools/upx" --best --lzma "$BIN"
