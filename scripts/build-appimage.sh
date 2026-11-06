@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT/scripts/native-binary.sh"
 OUT="${RPC_DIST_DIR:-${ROOT}/dist}"
 ARCH="$(uname -m)"
 VER="$(sed -n 's/^version = "\([^"]*\)"/\1/p' "$ROOT/Cargo.toml" | head -1)"
@@ -8,13 +9,12 @@ ID=org.neural_smith.PrintCreator
 BUILD="$OUT/.appimage-work"
 APPDIR="$BUILD/AppDir"
 [[ "$ARCH" == x86_64 || "$ARCH" == aarch64 ]] || { echo "Unsupported arch: $ARCH" >&2; exit 1; }
-for c in cargo curl; do command -v "$c" >/dev/null || { echo "Missing $c" >&2; exit 1; }; done
-[[ -f "$ROOT/Cargo.lock" ]] || (cd "$ROOT" && cargo generate-lockfile)
-(cd "$ROOT" && cargo build --release --locked --features gui)
+for c in curl; do command -v "$c" >/dev/null || { echo "Missing $c" >&2; exit 1; }; done
+ensure_native_binary "$ROOT"
 rm -rf "$BUILD"
 mkdir -p "$APPDIR/usr/bin" "$BUILD/tools" "$OUT/packages"
 python3 "$ROOT/scripts/generate-metadata.py" --output-dir "$BUILD/metadata"
-install -m755 "$ROOT/target/release/print-creator" "$APPDIR/usr/bin/print-creator"
+install -m755 "$RPC_NATIVE_BINARY" "$APPDIR/usr/bin/print-creator"
 install -Dm644 "$ROOT/LICENSE" "$APPDIR/usr/share/licenses/print-creator/LICENSE"
 install -Dm644 "$BUILD/metadata/${ID}.metainfo.xml" "$APPDIR/usr/share/metainfo/${ID}.metainfo.xml"
 # Match the desktop entry Icon= name; the source has a -256 suffix.

@@ -1,6 +1,6 @@
 [package]
 name = "print-creator"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 authors = ["neural-smith"]
 license = "GPL-2.0-or-later"
@@ -48,10 +48,8 @@ console_error_panic_hook = { version = "0.1", optional = true }
 tempfile = "3.13"
 
 [profile.release]
-opt-level = "z"
 lto = "thin"
 codegen-units = 1
-panic = "abort"
 strip = true
 
 # Skip bundled Binaryen; keep Rust release optimizations.

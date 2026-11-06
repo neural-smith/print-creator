@@ -3,9 +3,6 @@
   "runtime": "org.freedesktop.Platform",
   "runtime-version": "25.08",
   "sdk": "org.freedesktop.Sdk",
-  "sdk-extensions": [
-    "org.freedesktop.Sdk.Extension.rust-stable"
-  ],
   "command": "print-creator",
   "finish-args": [
     "--share=ipc",
@@ -19,16 +16,8 @@
     {
       "name": "print-creator",
       "buildsystem": "simple",
-      "build-options": {
-        "append-path": "/usr/lib/sdk/rust-stable/bin",
-        "env": {
-          "CARGO_HOME": "/run/build/print-creator/.cargo-home",
-          "CARGO_NET_OFFLINE": "true"
-        }
-      },
       "build-commands": [
-        "cargo build --offline --locked --release --features gui",
-        "install -Dm755 target/release/print-creator /app/bin/print-creator",
+        "install -Dm755 native/print-creator /app/bin/print-creator",
         "tools/upx --best --lzma /app/bin/print-creator",
         "tools/upx --test /app/bin/print-creator",
         "install -Dm644 packaging/desktop/org.neural_smith.PrintCreator.desktop /app/share/applications/org.neural_smith.PrintCreator.desktop",
